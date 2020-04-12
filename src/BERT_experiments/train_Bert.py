@@ -7,7 +7,7 @@ from keras.callbacks import EarlyStopping
 from keras.models import load_model
 from scipy.stats import pearsonr, spearmanr, kendalltau
 
-from src.BERT_experiments.BERT_model import BERT, compile_bert
+from src.BERT_experiments.Bert_model import BERT, compile_bert
 from configuration import CONFIG_DIR
 from experiments_output import OUTPUT_DIR
 from input import INPUT_DIR
@@ -15,7 +15,7 @@ from trained_models import MODELS_DIR
 
 CONFIG_PATH = os.path.join(CONFIG_DIR, 'config.json')
 
-SAVE_MODELS = False
+SAVE_MODELS = True
 
 
 def setup_logger():
@@ -76,7 +76,9 @@ def train(train_path, human_metric, mode, path_to_save, **params):
               epochs=10, validation_split=0.1, callbacks=[early])
 
     if SAVE_MODELS:
-        model.save(path_to_save)
+        print('Saving model')
+        np.save(path_to_save, model.get_weights(), allow_pickle=True)
+        print('Saved model')
 
     return model
 
@@ -92,7 +94,10 @@ def evaluate(model_path, test_path, model):
     """
 
     if SAVE_MODELS:
-        model = load_model(model_path, custom_objects={'BERT': BERT})
+        model = compile_bert(shape=(512, 512), dropout_rate=0.1, lr=2e-5, mode='Multi Task-5')
+        weights = np.load(model_path, allow_pickle=True)
+        print('Setting model weights')
+        model.set_weights(weights)
 
     test_data = dict(np.load(test_path, allow_pickle=True).item())
 
@@ -125,11 +130,11 @@ def compute_correlations(test_path, predictions, human_metric, mode):
     correlations = {}  # Here will be store the correlations
 
     test_human_metrics = {
-        'Q1': test_data['test_Q1'],
-        'Q2': test_data['test_Q2'],
-        'Q3': test_data['test_Q3'],
-        'Q4': test_data['test_Q4'],
-        'Q5': test_data['test_Q5']
+        'Q1': test_data['Q1'],
+        'Q2': test_data['Q2'],
+        'Q3': test_data['Q3'],
+        'Q4': test_data['Q4'],
+        'Q5': test_data['Q5']
     }
 
     for k in range(predictions.shape[1]):
@@ -225,7 +230,7 @@ def main():
 
                 for metric in ['Q1', 'Q2', 'Q3', 'Q4', 'Q5']:
 
-                    model_path = os.path.join(MODELS_DIR, 'BERT_{}_{}_{}.h5'.format(y, metric, mode))
+                    model_path = os.path.join(MODELS_DIR, 'BERT_{}_{}_{}.npy'.format(y, metric, mode))
 
                     model = train(train_path=train_data_path, human_metric=metric, mode=mode,
                                   path_to_save=model_path, **params[y][metric][mode])
@@ -236,7 +241,7 @@ def main():
 
             else:
 
-                model_path = os.path.join(MODELS_DIR, 'BERT_{}_{}.h5'.format(y, mode))
+                model_path = os.path.join(MODELS_DIR, 'BERT_{}_{}.npy'.format(y, mode))
 
                 model = train(train_path=train_data_path, human_metric=None, mode=mode,
                               path_to_save=model_path, **params[y][mode])
